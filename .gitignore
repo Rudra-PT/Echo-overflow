@@ -1,0 +1,12 @@
+# Node & React
+node_modules/
+dist/
+.env
+
+# Python & FastAPI
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+echo_overflow.db
