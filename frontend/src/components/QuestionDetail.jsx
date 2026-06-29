@@ -1,8 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 
 const API_BASE = 'http://localhost:8000'
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDate(isoString) {
   return new Date(isoString).toLocaleDateString('en-US', {
@@ -28,8 +26,6 @@ const AVATAR_PALETTES = [
 ]
 function avatarGradient(id) { return AVATAR_PALETTES[id % AVATAR_PALETTES.length] }
 
-// ─── Spinner ──────────────────────────────────────────────────────────────────
-
 function Spinner({ sm }) {
   const size = sm ? 'h-4 w-4' : 'h-5 w-5'
   return (
@@ -39,8 +35,6 @@ function Spinner({ sm }) {
     </svg>
   )
 }
-
-// ─── Alert banner ─────────────────────────────────────────────────────────────
 
 function Alert({ type, message, onDismiss }) {
   const s = type === 'error'
@@ -63,83 +57,119 @@ function Alert({ type, message, onDismiss }) {
   )
 }
 
-// ─── Upvote button ────────────────────────────────────────────────────────────
-
-function UpvoteButton({ answerId, token }) {
-  const [voted, setVoted] = useState(false)
-  const [count, setCount] = useState(0)
+function VoteButtons({ answerId, token, initialScore, initialMyVote }) {
+  const [myVote, setMyVote] = useState(initialMyVote ?? 0)
+  const [score, setScore] = useState(initialScore ?? 0)
   const [loading, setLoading] = useState(false)
 
-  const handleVote = async () => {
+  const castVote = async (dir) => {
     if (!token || loading) return
 
-    const nextDir = voted ? 0 : 1
-    setLoading(true)
+    const nextDir = myVote === dir ? 0 : dir
+    const prevVote = myVote
+    const prevScore = score
 
-    // Optimistic update
-    setVoted(!voted)
-    setCount((c) => c + (nextDir === 1 ? 1 : -1))
+    setMyVote(nextDir)
+    setScore(score + nextDir - myVote)
+    setLoading(true)
 
     try {
       const res = await fetch(`${API_BASE}/vote/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ answer_id: answerId, dir: nextDir }),
       })
-
-      // 409 = already voted, 404 = no vote — both are soft signals, no revert needed
-      if (!res.ok && res.status !== 409 && res.status !== 404) {
-        setVoted(voted)
-        setCount((c) => c + (nextDir === 1 ? -1 : 1))
+      if (!res.ok) {
+        setMyVote(prevVote)
+        setScore(prevScore)
       }
     } catch {
-      setVoted(voted)
-      setCount((c) => c + (nextDir === 1 ? -1 : 1))
+      setMyVote(prevVote)
+      setScore(prevScore)
     } finally {
       setLoading(false)
     }
   }
 
+  const baseBtn = `inline-flex items-center justify-center w-7 h-7 rounded-full border
+                   transition-all duration-200 focus:outline-none focus-visible:ring-2
+                   focus-visible:ring-orange-400 disabled:cursor-not-allowed select-none active:scale-95`
+
+  const upActive   = `bg-orange-400 border-orange-400 text-white hover:bg-orange-300 hover:border-orange-300
+                       dark:bg-orange-500 dark:border-orange-500 dark:hover:bg-orange-400`
+  const upInactive = `bg-white border-stone-200 text-stone-400 hover:border-orange-400 hover:text-orange-500
+                       dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-400
+                       dark:hover:border-orange-500 dark:hover:text-orange-400`
+  const downActive   = `bg-orange-400 border-orange-400 text-white hover:bg-orange-300 hover:border-orange-300
+                         dark:bg-orange-500 dark:border-orange-500 dark:hover:bg-orange-400`
+  const downInactive = `bg-white border-stone-200 text-stone-400 hover:border-orange-400 hover:text-orange-500
+                         dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-400
+                         dark:hover:border-orange-500 dark:hover:text-orange-400`
+
   return (
-    <button
-      id={`upvote-answer-${answerId}`}
-      onClick={handleVote}
-      disabled={loading || !token}
-      title={!token ? 'Log in to upvote' : voted ? 'Remove upvote' : 'Upvote this answer'}
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold
-                  border transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400
-                  disabled:cursor-not-allowed select-none active:scale-95
-                  ${voted
-                    ? 'bg-yellow-400 border-yellow-400 text-stone-900 hover:bg-yellow-300 hover:border-yellow-300 dark:bg-yellow-400 dark:border-yellow-400 dark:text-stone-900 dark:hover:bg-yellow-300'
-                    : 'bg-white border-stone-200 text-stone-500 hover:border-yellow-400 hover:text-yellow-600 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-400 dark:hover:border-yellow-500 dark:hover:text-yellow-400'
-                  }`}
-    >
-      {loading ? (
-        <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+    <div className="inline-flex items-center gap-1.5">
+      <button
+        id={`upvote-answer-${answerId}`}
+        onClick={() => castVote(1)}
+        disabled={loading || !token}
+        title={!token ? 'Log in to vote' : myVote === 1 ? 'Remove upvote' : 'Upvote this answer'}
+        className={`${baseBtn} ${myVote === 1 ? upActive : upInactive}`}
+      >
+        {loading ? (
+          <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+          </svg>
+        ) : (
+          <svg className={`w-3.5 h-3.5 transition-transform duration-150 ${myVote === 1 ? 'scale-110' : ''}`}
+               fill={myVote === 1 ? 'currentColor' : 'none'} viewBox="0 0 24 24"
+               stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+          </svg>
+        )}
+      </button>
+
+      <span className={`text-xs font-bold tabular-nums w-5 text-center leading-none
+                        ${score > 0 ? 'text-orange-500 dark:text-orange-400'
+                                    : score < 0 ? 'text-rose-500 dark:text-rose-400'
+                                                : 'text-stone-400 dark:text-neutral-500'}`}>
+        {score}
+      </span>
+
+      <button
+        id={`downvote-answer-${answerId}`}
+        onClick={() => castVote(-1)}
+        disabled={loading || !token}
+        title={!token ? 'Log in to vote' : myVote === -1 ? 'Remove downvote' : 'Downvote this answer'}
+        className={`${baseBtn} ${myVote === -1 ? downActive : downInactive}`}
+      >
+        <svg className={`w-3.5 h-3.5 transition-transform duration-150 ${myVote === -1 ? 'scale-110' : ''}`}
+             fill={myVote === -1 ? 'currentColor' : 'none'} viewBox="0 0 24 24"
+             stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
-      ) : (
-        <svg
-          className={`w-3 h-3 transition-transform duration-150 ${voted ? 'scale-110' : ''}`}
-          fill={voted ? 'currentColor' : 'none'}
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round"
-            d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
-        </svg>
-      )}
-      {count > 0 && <span>{count}</span>}
-    </button>
+      </button>
+    </div>
   )
 }
 
-// ─── Answer card ──────────────────────────────────────────────────────────────
+function RepBadge({ rep }) {
+  const color = rep >= 100
+    ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-400/10 border-amber-200 dark:border-amber-400/30'
+    : rep >= 10
+    ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-400/10 border-emerald-200 dark:border-emerald-400/30'
+    : 'text-stone-500 dark:text-neutral-400 bg-stone-100 dark:bg-neutral-800 border-stone-200 dark:border-neutral-700'
+
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold border rounded-full px-1.5 py-0.5 ${color}`}
+          title="Reputation score">
+      ★ {rep}
+    </span>
+  )
+}
 
 function AnswerCard({ answer, index, token }) {
   return (
@@ -147,16 +177,18 @@ function AnswerCard({ answer, index, token }) {
       id={`answer-${answer.id}`}
       className="bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-2xl overflow-hidden"
     >
-      {/* Header */}
       <div className="flex items-center gap-3 px-5 py-3 border-b border-stone-100 dark:border-neutral-800 bg-stone-50/60 dark:bg-neutral-800/40">
         <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${avatarGradient(answer.user_id)}
                          flex items-center justify-center text-white text-xs font-bold shrink-0`}>
-          U{answer.user_id}
+          {(answer.author_username?.[0] ?? 'U').toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold text-stone-700 dark:text-neutral-300 leading-none">
-            User #{answer.user_id}
-          </p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="text-xs font-semibold text-stone-700 dark:text-neutral-300 leading-none">
+              {answer.author_username ?? `User #${answer.user_id}`}
+            </p>
+            <RepBadge rep={answer.author_reputation ?? 0} />
+          </div>
           <p className="text-[11px] text-stone-400 dark:text-neutral-500 mt-0.5">
             {timeAgo(answer.created_at)}
           </p>
@@ -174,14 +206,12 @@ function AnswerCard({ answer, index, token }) {
         )}
       </div>
 
-      {/* Body */}
       <div className="px-5 py-4">
         <p className="text-sm text-stone-700 dark:text-neutral-300 leading-relaxed whitespace-pre-wrap">
           {answer.content}
         </p>
       </div>
 
-      {/* Footer */}
       <div className="px-5 py-2.5 border-t border-stone-100 dark:border-neutral-800 flex items-center justify-between">
         <span className="inline-flex items-center gap-1 text-[11px] text-stone-400 dark:text-neutral-500">
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -190,13 +220,16 @@ function AnswerCard({ answer, index, token }) {
           </svg>
           {formatDate(answer.created_at)}
         </span>
-        <UpvoteButton answerId={answer.id} token={token} />
+        <VoteButtons
+          answerId={answer.id}
+          token={token}
+          initialScore={answer.vote_score ?? 0}
+          initialMyVote={answer.my_vote ?? 0}
+        />
       </div>
     </div>
   )
 }
-
-// ─── Answer form ──────────────────────────────────────────────────────────────
 
 function AnswerForm({ questionId, token, onPosted }) {
   const [content, setContent] = useState('')
@@ -219,7 +252,7 @@ function AnswerForm({ questionId, token, onPosted }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ content: content.trim() }),
       })
@@ -248,7 +281,6 @@ function AnswerForm({ questionId, token, onPosted }) {
       noValidate
       className="bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-2xl overflow-hidden"
     >
-      {/* Form header */}
       <div className="px-5 py-4 border-b border-stone-100 dark:border-neutral-800 bg-stone-50/60 dark:bg-neutral-800/40">
         <h3 className="text-sm font-semibold text-stone-700 dark:text-neutral-300">Your Answer</h3>
         <p className="text-xs text-stone-400 dark:text-neutral-500 mt-0.5">Be clear, specific and helpful.</p>
@@ -308,58 +340,80 @@ function AnswerForm({ questionId, token, onPosted }) {
   )
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-
 export default function QuestionDetail({ questionId, token, onBack }) {
   const [question, setQuestion] = useState(null)
-  const [answers, setAnswers] = useState([])
+  const [answers, setAnswers]   = useState([])
   const [qLoading, setQLoading] = useState(true)
   const [aLoading, setALoading] = useState(true)
-  const [qError, setQError] = useState(null)
-  const [aError, setAError] = useState(null)
-
-  const fetchQuestion = useCallback(async () => {
-    setQLoading(true)
-    setQError(null)
-    try {
-      const res = await fetch(`${API_BASE}/questions/${questionId}`)
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        throw new Error(d?.detail || `HTTP ${res.status}`)
-      }
-      setQuestion(await res.json())
-    } catch (err) {
-      setQError(err.message)
-    } finally {
-      setQLoading(false)
-    }
-  }, [questionId])
-
-  const fetchAnswers = useCallback(async () => {
-    setALoading(true)
-    setAError(null)
-    try {
-      const res = await fetch(`${API_BASE}/answers/question/${questionId}`)
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        throw new Error(d?.detail || `HTTP ${res.status}`)
-      }
-      setAnswers(await res.json())
-    } catch (err) {
-      setAError(err.message)
-    } finally {
-      setALoading(false)
-    }
-  }, [questionId])
+  const [qError, setQError]     = useState(null)
+  const [aError, setAError]     = useState(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
-    fetchQuestion()
-    fetchAnswers()
-  }, [fetchQuestion, fetchAnswers])
+    const controller = new AbortController()
+    const { signal } = controller
+
+    const loadQuestion = async () => {
+      setQLoading(true)
+      setQError(null)
+      try {
+        const res = await fetch(`${API_BASE}/questions/${questionId}`, { signal })
+        if (signal.aborted) return
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}))
+          throw new Error(d?.detail || `HTTP ${res.status}`)
+        }
+        if (!signal.aborted) setQuestion(await res.json())
+      } catch (err) {
+        if (!signal.aborted) setQError(err.message)
+      } finally {
+        if (!signal.aborted) setQLoading(false)
+      }
+    }
+
+    const loadAnswers = async () => {
+      setALoading(true)
+      setAError(null)
+      try {
+        const headers = token ? { Authorization: `Bearer ${token}` } : {}
+        const res = await fetch(`${API_BASE}/answers/question/${questionId}`, { headers, signal })
+        if (signal.aborted) return
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}))
+          throw new Error(d?.detail || `HTTP ${res.status}`)
+        }
+        const data = await res.json()
+        if (!signal.aborted) {
+          setAnswers([...data].sort((a, b) => (b.vote_score ?? 0) - (a.vote_score ?? 0)))
+        }
+      } catch (err) {
+        if (!signal.aborted) setAError(err.message)
+      } finally {
+        if (!signal.aborted) setALoading(false)
+      }
+    }
+
+    loadQuestion()
+    loadAnswers()
+
+    return () => controller.abort()
+  }, [questionId, token, refreshKey])
+
+  const handleRefreshAnswers = () => setRefreshKey((k) => k + 1)
 
   const handleAnswerPosted = (newAnswer) => {
-    setAnswers((prev) => [...prev, newAnswer])
+    const enriched = {
+      ...newAnswer,
+      vote_score: 0,
+      my_vote: 0,
+      author_username: newAnswer.author_username ?? `User #${newAnswer.user_id}`,
+      author_reputation: newAnswer.author_reputation ?? 0,
+    }
+    setAnswers((prev) =>
+      [...prev, enriched].sort((a, b) => (b.vote_score ?? 0) - (a.vote_score ?? 0))
+    )
   }
+
 
   return (
     <div className="min-h-screen
@@ -368,7 +422,6 @@ export default function QuestionDetail({ questionId, token, onBack }) {
                     py-10 px-4 transition-colors duration-300">
       <div className="max-w-xl mx-auto">
 
-        {/* ── Back button ── */}
         <button
           id="back-to-feed-btn"
           onClick={onBack}
@@ -383,7 +436,6 @@ export default function QuestionDetail({ questionId, token, onBack }) {
           Back to feed
         </button>
 
-        {/* ── Question card ── */}
         {qLoading ? (
           <div className="bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-2xl overflow-hidden animate-pulse mb-6">
             <div className="flex items-center gap-3 px-5 py-4 border-b border-stone-100 dark:border-neutral-800">
@@ -408,7 +460,6 @@ export default function QuestionDetail({ questionId, token, onBack }) {
             id={`question-detail-${question.id}`}
             className="bg-white dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 rounded-2xl overflow-hidden mb-6"
           >
-            {/* Question header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 dark:border-neutral-800 bg-stone-50/60 dark:bg-neutral-800/40">
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${avatarGradient(question.user_id)}
@@ -432,7 +483,6 @@ export default function QuestionDetail({ questionId, token, onBack }) {
               </span>
             </div>
 
-            {/* Question body */}
             <div className="px-5 py-5">
               <h1 className="text-base font-bold text-stone-800 dark:text-neutral-100 leading-snug mb-3">
                 {question.title}
@@ -442,7 +492,6 @@ export default function QuestionDetail({ questionId, token, onBack }) {
               </p>
             </div>
 
-            {/* Question footer */}
             <div className="px-5 py-3 border-t border-stone-100 dark:border-neutral-800 flex items-center gap-2 text-[11px] text-stone-400 dark:text-neutral-500">
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round"
@@ -453,7 +502,6 @@ export default function QuestionDetail({ questionId, token, onBack }) {
           </article>
         )}
 
-        {/* ── Answers section header ── */}
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-stone-700 dark:text-neutral-300">
             {aLoading ? 'Loading answers…' : `${answers.length} Answer${answers.length !== 1 ? 's' : ''}`}
@@ -461,7 +509,7 @@ export default function QuestionDetail({ questionId, token, onBack }) {
           {!aLoading && (
             <button
               id="refresh-answers-btn"
-              onClick={fetchAnswers}
+              onClick={handleRefreshAnswers}
               className="p-1.5 rounded-lg text-stone-400 dark:text-neutral-500
                          hover:text-stone-600 dark:hover:text-neutral-300
                          hover:bg-stone-100 dark:hover:bg-neutral-800
@@ -475,7 +523,6 @@ export default function QuestionDetail({ questionId, token, onBack }) {
           )}
         </div>
 
-        {/* ── Answers list ── */}
         {aLoading ? (
           <div className="space-y-3 mb-6">
             {[1, 2].map((i) => (
@@ -512,7 +559,6 @@ export default function QuestionDetail({ questionId, token, onBack }) {
           </div>
         )}
 
-        {/* ── Post answer form ── */}
         {!qLoading && !qError && (
           <AnswerForm
             questionId={questionId}

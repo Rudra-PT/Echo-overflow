@@ -13,6 +13,7 @@ class User(base):
     username: Mapped[str] = mapped_column(String, unique=True, index=True)
     email: Mapped[str] = mapped_column(String, unique=True, index=True)
     password: Mapped[str] = mapped_column(String)
+    reputation: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now())
 
@@ -63,3 +64,5 @@ class Vote(base):
         "users.id", ondelete="CASCADE"), primary_key=True)
     answer_id: Mapped[int] = mapped_column(ForeignKey(
         "answers.id", ondelete="CASCADE"), primary_key=True)
+    # +1 = upvote, -1 = downvote
+    vote_value: Mapped[int] = mapped_column(Integer, default=1)

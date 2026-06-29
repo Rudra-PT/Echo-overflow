@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from datetime import datetime
 from typing import Optional
 
@@ -13,6 +13,7 @@ class UserResponse(BaseModel):
     id: int
     username: str
     email: EmailStr
+    reputation: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
@@ -51,6 +52,20 @@ class AnswerResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AnswerWithVotes(BaseModel):
+    id: int
+    content: str
+    user_id: int
+    question_id: int
+    created_at: datetime
+    is_ai_generated: bool
+    vote_score: int
+    author_username: str
+    author_reputation: int
+    my_vote: int
+    model_config = ConfigDict(from_attributes=True)
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -58,7 +73,16 @@ class Token(BaseModel):
 
 class VoteCreate(BaseModel):
     answer_id: int
-    dir: int = Field(ge=0, le=1, description="1 to vote, 0 to remove vote")
+    dir: int = Field(description="1 = upvote, -1 = downvote, 0 = remove vote")
+
+    @field_validator("dir")
+    @classmethod
+    def validate_dir(cls, v: int) -> int:
+        if v not in (-1, 0, 1):
+            raise ValueError("dir must be -1, 0, or 1")
+        return v
+
+    model_config = ConfigDict(json_schema_extra={"example": {"answer_id": 1, "dir": 1}})
 
 
 class ForgotPasswordRequest(BaseModel):
