@@ -6,6 +6,8 @@ import QuestionList   from './components/QuestionList'
 import QuestionDetail from './components/QuestionDetail'
 import AuthForm       from './components/AuthForm'
 import CreatePostForm from './components/CreatePostForm'
+import ForgotPassword from './components/ForgotPassword'
+import ResetPassword  from './components/ResetPassword'
 
 // ─── Page wrappers ────────────────────────────────────────────────────────────
 
@@ -52,6 +54,21 @@ function LoginPage({ onLoginSuccess }) {
       onSignUpSuccess={() => {/* stay – show success message inside the form */}}
     />
   )
+}
+
+/**
+ * /forgot-password  →  ForgotPassword
+ */
+function ForgotPasswordPage() {
+  return <ForgotPassword />
+}
+
+/**
+ * /reset-password  →  ResetPassword
+ * The token is read from the query-string inside the component itself.
+ */
+function ResetPasswordPage() {
+  return <ResetPassword />
 }
 
 /**
@@ -105,7 +122,9 @@ function AppRoutes() {
         <Route path="/"            element={<FeedPage token={token} />} />
 
         {/* Auth */}
-        <Route path="/login"       element={<LoginPage onLoginSuccess={handleLoginSuccess} />} />
+        <Route path="/login"          element={<LoginPage onLoginSuccess={handleLoginSuccess} />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password"  element={<ResetPasswordPage />} />
 
         {/* Ask a question (protected) */}
         <Route path="/ask"         element={<AskPage token={token} />} />

@@ -59,3 +59,12 @@ class Token(BaseModel):
 class VoteCreate(BaseModel):
     answer_id: int
     dir: int = Field(ge=0, le=1, description="1 to vote, 0 to remove vote")
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8)

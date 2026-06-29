@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 const API_BASE_URL = "http://localhost:8000";
 
@@ -192,6 +193,17 @@ function LoginForm({ onSuccess }) {
         disabled={isLoading}
         error={fieldErrors.password}
       />
+
+      {/* Forgot password link */}
+      <div className="flex justify-end -mt-2">
+        <Link
+          to="/forgot-password"
+          id="forgot-password-link"
+          className="text-xs text-amber-600 font-medium hover:text-amber-500 transition-colors"
+        >
+          Forgot password?
+        </Link>
+      </div>
 
       <button
         id="login-submit"
